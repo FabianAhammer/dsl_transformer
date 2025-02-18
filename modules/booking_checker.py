@@ -110,143 +110,135 @@ class BookingChecker:
             # check if it the holiday amount is not None, if it is, we need to book the difference
             if holiday_amount.total_seconds() == 0:
                 # Check if we actually have a difference in required hours and booked hours in jira
-                if abs(total_real_task_seconds - required_hours.total_seconds()) > 5:
-                    # we only need to book if we have something in jira, otherwise skip
-                    if total_real_task_seconds > 0:
-                        logger.error(
-                            f"Found unbooked Time in DSL Sheet '{sheet_name}' - {formatted_date}, calculating date"
-                        )
-                        # find the earliest timedelta
-                        # json["results"]["startTime"]: "09:00:00"
-                        earliest_time = min(
-                            [
-                                datetime.strptime(item["startTime"], "%H:%M:%S").time()
-                                for item in response_json["results"]
-                            ]
-                        )
-
-                        logger.error("Earliest time found: " + str(earliest_time))
-                        logger.error(f"Jira Tasks:{formatted_time_real_tasks_api_str}")
-
-                        # Check if we need a break (6 hours or more)
-                        needs_break = (
-                            total_real_task_seconds >= 21600
-                        )  # 6 hours in seconds
-
-                        if needs_break:
-                            # Calculate time available until 12:00
-                            seconds_to_12 = (
-                                timedelta(hours=12).total_seconds()
-                                - timedelta(
-                                    hours=earliest_time.hour,
-                                    minutes=earliest_time.minute,
-                                    seconds=earliest_time.second,
-                                ).seconds
-                            )
-
-                            # Split the time with a break
-                            start_am = earliest_time
-                            end_am = datetime.strptime("12:00:00", "%H:%M:%S").time()
-                            start_pm = datetime.strptime("12:30:00", "%H:%M:%S").time()
-                            end_pm = self.add_seconds_to_time(
-                                start_pm, total_real_task_seconds - seconds_to_12
-                            )
-                            logger.error(
-                                f"Need to book {start_am.strftime('%H:%M:%S')} - {end_am.strftime('%H:%M:%S')}"
-                            )
-                            logger.error(
-                                f"and then {start_pm.strftime('%H:%M:%S')} - {end_pm.strftime('%H:%M:%S')}"
-                            )
-
-                            # Check if any worklog has homeoffice attribute
-                            is_homeoffice = any(
-                                any(
-                                    attr.get("key") == "_TestBox_"
-                                    and attr.get("value") == "JA"
-                                    for attr in item.get("attributes", {}).get(
-                                        "values", []
-                                    )
-                                )
-                                for item in response_json.get("results", [])
-                            )
-
-                            # Add to Excel tracker with break
-                            self.excel_changes_tracker.add_change(
-                                sheet_name=sheet_name,
-                                row=index,
-                                proposed_am_start=start_am,
-                                proposed_am_end=end_am,
-                                proposed_pm_start=start_pm,
-                                proposed_pm_end=end_pm,
-                                is_homeoffice=is_homeoffice,
-                                nlz_time=formatted_nlz_time_api_str
-                                if grouped_nlz_seconds > 0
-                                else None,
-                            )
-                        else:
-                            # No break needed - book all time starting from earliest_time
-                            start_am = earliest_time
-                            end_am = self.add_seconds_to_time(
-                                earliest_time, total_real_task_seconds
-                            )
-                            logger.error(
-                                f"Need to book {start_am.strftime('%H:%M:%S')} - {end_am.strftime('%H:%M:%S')}"
-                            )
-
-                            # Check if any worklog has homeoffice attribute
-                            is_homeoffice = any(
-                                any(
-                                    attr.get("key") == "_TestBox_"
-                                    and attr.get("value") == "JA"
-                                    for attr in item.get("attributes", {}).get(
-                                        "values", []
-                                    )
-                                )
-                                for item in response_json.get("results", [])
-                            )
-
-                            # Add to Excel tracker without break
-                            self.excel_changes_tracker.add_change(
-                                sheet_name=sheet_name,
-                                row=index,
-                                proposed_am_start=start_am,
-                                proposed_am_end=end_am,
-                                is_homeoffice=is_homeoffice,
-                                nlz_time=formatted_nlz_time_api_str
-                                if grouped_nlz_seconds > 0
-                                else None,
-                            )
-
-                        return True
-
-            else:
-                # Check if the difference is more than 5 seconds, if it is, we need to book the difference
-                if abs(grouped_nlz_seconds - holiday_amount.total_seconds()) > 5:
+                if booked_time_dsl.total_seconds() == 0 and total_real_task_seconds > 0:
                     logger.error(
-                        f"Inconsistent booking found in Sheet '{sheet_name}' - {formatted_date}"
+                        f"Found unbooked Time in DSL Sheet '{sheet_name}' - {formatted_date}, calculating date"
                     )
-                    logger.error(f"DSL NLZ:   {formatted_holiday_dsl}")
-                    logger.error(f"Jira NLZ:  {formatted_nlz_time_api_str}")
+                    # find the earliest timedelta
+                    # json["results"]["startTime"]: "09:00:00"
+                    earliest_time = min(
+                        [
+                            datetime.strptime(item["startTime"], "%H:%M:%S").time()
+                            for item in response_json["results"]
+                        ]
+                    )
 
-                    # Check if any worklog has homeoffice attribute
-                    is_homeoffice = any(
-                        any(
-                            attr.get("key") == "_TestBox_" and attr.get("value") == "JA"
-                            for attr in item.get("attributes", {}).get("values", [])
+                    logger.error("Earliest time found: " + str(earliest_time))
+                    logger.error(f"Jira Tasks:{formatted_time_real_tasks_api_str}")
+
+                    # Check if we need a break (6 hours or more)
+                    needs_break = total_real_task_seconds >= 21600  # 6 hours in seconds
+
+                    if needs_break:
+                        # Calculate time available until 12:00
+                        seconds_to_12 = (
+                            timedelta(hours=12).total_seconds()
+                            - timedelta(
+                                hours=earliest_time.hour,
+                                minutes=earliest_time.minute,
+                                seconds=earliest_time.second,
+                            ).seconds
                         )
-                        for item in response_json.get("results", [])
-                    )
 
-                    # Add to Excel tracker
-                    self.excel_changes_tracker.add_change(
-                        sheet_name=sheet_name,
-                        row=index,
-                        is_homeoffice=is_homeoffice,
-                        nlz_time=formatted_nlz_time_api_str
-                        if grouped_nlz_seconds > 0
-                        else None,
-                    )
-                    return False
+                        # Split the time with a break
+                        start_am = earliest_time
+                        end_am = datetime.strptime("12:00:00", "%H:%M:%S").time()
+                        start_pm = datetime.strptime("12:30:00", "%H:%M:%S").time()
+                        end_pm = self.add_seconds_to_time(
+                            start_pm, total_real_task_seconds - seconds_to_12
+                        )
+                        logger.error(
+                            f"Need to book {start_am.strftime('%H:%M:%S')} - {end_am.strftime('%H:%M:%S')}"
+                        )
+                        logger.error(
+                            f"and then {start_pm.strftime('%H:%M:%S')} - {end_pm.strftime('%H:%M:%S')}"
+                        )
+
+                        # Check if any worklog has homeoffice attribute
+                        is_homeoffice = any(
+                            any(
+                                attr.get("key") == "_TestBox_"
+                                and attr.get("value") == "JA"
+                                for attr in item.get("attributes", {}).get("values", [])
+                            )
+                            for item in response_json.get("results", [])
+                        )
+
+                        # Add to Excel tracker with break
+                        self.excel_changes_tracker.add_change(
+                            sheet_name=sheet_name,
+                            row=index,
+                            proposed_am_start=start_am,
+                            proposed_am_end=end_am,
+                            proposed_pm_start=start_pm,
+                            proposed_pm_end=end_pm,
+                            is_homeoffice=is_homeoffice,
+                            nlz_time=formatted_nlz_time_api_str
+                            if grouped_nlz_seconds > 0
+                            else None,
+                        )
+                    else:
+                        # No break needed - book all time starting from earliest_time
+                        start_am = earliest_time
+                        end_am = self.add_seconds_to_time(
+                            earliest_time, total_real_task_seconds
+                        )
+                        logger.error(
+                            f"Need to book {start_am.strftime('%H:%M:%S')} - {end_am.strftime('%H:%M:%S')}"
+                        )
+
+                        # Check if any worklog has homeoffice attribute
+                        is_homeoffice = any(
+                            any(
+                                attr.get("key") == "_TestBox_"
+                                and attr.get("value") == "JA"
+                                for attr in item.get("attributes", {}).get("values", [])
+                            )
+                            for item in response_json.get("results", [])
+                        )
+
+                        # Add to Excel tracker without break
+                        self.excel_changes_tracker.add_change(
+                            sheet_name=sheet_name,
+                            row=index,
+                            proposed_am_start=start_am,
+                            proposed_am_end=end_am,
+                            is_homeoffice=is_homeoffice,
+                            nlz_time=formatted_nlz_time_api_str
+                            if grouped_nlz_seconds > 0
+                            else None,
+                        )
+
+                    return True
+
+            # else:
+            #     # Check if the difference is more than 5 seconds, if it is, we need to book the difference
+            #     if abs(grouped_nlz_seconds - holiday_amount.total_seconds()) > 5:
+            #         logger.error(
+            #             f"Inconsistent booking found in Sheet '{sheet_name}' - {formatted_date}"
+            #         )
+            #         logger.error(f"DSL NLZ:   {formatted_holiday_dsl}")
+            #         logger.error(f"Jira NLZ:  {formatted_nlz_time_api_str}")
+
+            #         # Check if any worklog has homeoffice attribute
+            #         is_homeoffice = any(
+            #             any(
+            #                 attr.get("key") == "_TestBox_" and attr.get("value") == "JA"
+            #                 for attr in item.get("attributes", {}).get("values", [])
+            #             )
+            #             for item in response_json.get("results", [])
+            #         )
+
+            #         # Add to Excel tracker
+            #         self.excel_changes_tracker.add_change(
+            #             sheet_name=sheet_name,
+            #             row=index,
+            #             is_homeoffice=is_homeoffice,
+            #             nlz_time=formatted_nlz_time_api_str
+            #             if grouped_nlz_seconds > 0
+            #             else None,
+            #         )
+            #         return False
 
         # check if the booked is the same in both jira and dsl, otherwise advise
         # also check if there is booked nlz, as this is not real time, and we need to check if
