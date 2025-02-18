@@ -19,7 +19,7 @@ This program generates a Dienststundenliste (DSL) from your JIRA Tempo Entries. 
 
 Make sure you have Python installed, then install the required dependencies:
 
-pip install -r requirements.txt
+`pip install -r requirements.txt`
 
 ### 🔧 Configuration
 
@@ -29,10 +29,13 @@ You must set the filename and JIRA API Key inside main.py before running the scr
 
 Run the program with:
 
-python main.py
+`python main.py`
 
 ### 📂 Output
 
 Dienststundenliste: Generated from your JIRA Tempo entries.
+
+
+
 
 Conflict Diff (.xlsx): Highlights any discrepancies found.
