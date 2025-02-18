@@ -71,16 +71,27 @@ if __name__ == "__main__":
             break
         # Loop through cells "N8" to "N38" (which is column N, rows 7 to 37 in zero-based indexing)
         for index in range(7, 38):  # N8 corresponds to row 7 (zero-based)
-            booked_time = Util.get_booked_time_for_index(df, index)
-            if pd.isna(booked_time):
-                continue
+            try:
+                booked_time = Util.get_booked_time_for_index(df, index)
+                booked_time.total_seconds()
+            except Exception:
+                booked_time = dt.timedelta(0)
 
             day = Util.get_day_for_index(df, index)
             if not pd.to_numeric(day, errors="coerce") or pd.isna(day):
                 break
-            required_hours = Util.get_required_hours_for_index(df, index)
 
-            holiday_amount = Util.get_holiday_amount_for_index(df, index)
+            try:
+                required_hours = Util.get_required_hours_for_index(df, index)
+                required_hours.total_seconds()
+            except Exception:
+                required_hours = dt.timedelta(0)
+
+            try:
+                holiday_amount = Util.get_holiday_amount_for_index(df, index)
+                holiday_amount.total_seconds()
+            except Exception:
+                holiday_amount = dt.timedelta(0)
 
             if pd.isna(required_hours):
                 break
