@@ -23,7 +23,7 @@ Make sure you have Python installed, then install the required dependencies:
 
 ### 🔧 Configuration
 
-You must set the filename and JIRA API Key inside main.py before running the script.
+You must set the filename and JIRA API Key inside **main.py** before running the script.
 
 ### ▶️ Usage
 
